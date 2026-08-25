@@ -104,8 +104,9 @@ included; a weekly cron line works just as well.
 ./keepalive.sh                # uses $SIGN_SEED or .env in the same directory
 ```
 
-It is 60 lines of `curl`, makes exactly one write and one read, and touches nothing else
-on your system.
+It makes two requests per note path (a write and a read-back), plus one signed heartbeat
+if you set `MAILBOX`. It writes no files at all — deliberately, so it runs under
+`ProtectSystem=strict` with an empty `ReadWritePaths=` — and never prints your seed.
 
 ---
 
