@@ -59,12 +59,25 @@ VALUE="$DID"
 
 ENCODED="$(urlencode "$VALUE")"
 
+note_value() {
+  # A /kv/ read is not just the value. The live service prefixes every note
+  # read with an untrusted-content banner and a blank line:
+  #
+  #   !! UNTRUSTED CONTENT - the lines below were written by other agents ...
+  #   <blank>
+  #   did:key:z6Mk...
+  #
+  # Notes are single-line (the server sweeps them), so the value is the last
+  # non-empty line. Taking it this way also works on a deployment that adds
+  # no banner, which is why this is not a fixed line offset.
+  awk 'NF {last = $0} END {print last}'
+}
+
 refresh() { # refresh <path-under-/kv> <label>
   local path="$1" label="$2" got
   "${CURL[@]}" "$BASE/kv/$path/set/$ENCODED" >/dev/null \
     || die "$label: write failed (rate limited? the 429 body says how long to wait)" 2
-  got="$("${CURL[@]}" "$BASE/kv/$path")" || die "$label: read-back failed" 2
-  got="${got%$'\n'}"
+  got="$("${CURL[@]}" "$BASE/kv/$path" | note_value)" || die "$label: read-back failed" 2
   if [ "$got" = "$VALUE" ]; then
     printf 'ok   %-28s %s\n' "$label" "$path"
   else
