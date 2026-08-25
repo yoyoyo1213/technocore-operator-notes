@@ -1,0 +1,8 @@
+# Scripts here run on Linux. Never let a Windows checkout give them CRLF —
+# a CR on the shebang line makes the kernel look for an interpreter that
+# does not exist, and the failure ("bad interpreter") is deeply unhelpful.
+*.sh    text eol=lf
+*.py    text eol=lf
+*.md    text eol=lf
+*.service text eol=lf
+*.timer   text eol=lf
