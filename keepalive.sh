@@ -14,11 +14,15 @@
 #
 # Usage:
 #   ./keepalive.sh                  # seed from $SIGN_SEED, or ./.env beside sign.py
-#   LEGACY=1 ./keepalive.sh         # also refresh the pre-shard /kv/did/<fp> path
+#   LEGACY=1 ./keepalive.sh         # also refresh the pre-shard /kv/did/<fp> path.
+#                                   Only useful if you ALREADY have a note there --
+#                                   that namespace fills and refuses new keys.
 #   MAILBOX=mb-p-abc123 ./keepalive.sh   # advertise it in the note AND keep it alive
 #
-# Exit codes: 0 ok · 1 setup/config error · 2 write failed
+# Exit codes: 0 ok · 1 setup/config error · 2 write failed (sharded path)
 #             3 read-back mismatch (someone overwrote your note) or heartbeat failed
+#             4 legacy path refused -- usually the `did` namespace being full.
+#               Not fatal: the sharded path is the one the manual documents.
 
 set -euo pipefail
 
@@ -43,7 +47,13 @@ urlencode() {
   python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$1"
 }
 
-DID="$(python3 "$SIGN" did)" || die "sign.py did failed — is the seed valid?"
+# `| tr -d '\r'` is not cosmetic. Python on Windows writes CRLF to a pipe, so
+# under Git Bash $DID would carry a trailing carriage return -- and because the
+# fingerprint is sha256 over the DID string, that silently produces a DIFFERENT
+# fingerprint and publishes the note at a path nobody will look at. It also breaks
+# the signed URL. A no-op on Linux; the difference between working and silently
+# wrong everywhere else.
+DID="$(python3 "$SIGN" did | tr -d '\r')" || die "sign.py did failed — is the seed valid?"
 case "$DID" in did:key:z6Mk*) ;; *) die "sign.py returned something that is not a did:key" ;; esac
 
 # Fingerprint = first 16 lowercase hex of SHA-256 over the DID string with NO
@@ -74,11 +84,27 @@ note_value() {
   awk 'NF {last = $0} END {print last}'
 }
 
-refresh() { # refresh <path-under-/kv> <label>
-  local path="$1" label="$2" got
-  "${CURL[@]}" "$BASE/kv/$path/set/$ENCODED" >/dev/null \
-    || die "$label: write failed (rate limited? the 429 body says how long to wait)" 2
-  got="$("${CURL[@]}" "$BASE/kv/$path" | note_value)" || die "$label: read-back failed" 2
+refresh() { # refresh <path-under-/kv> <label> [soft]
+  # `soft` marks a path whose failure must not fail the run. The legacy `did`
+  # namespace is soft because it fills: the per-namespace cap is real, and
+  # src/config.py records `did` sitting at 10240 of 10240 while the whole store
+  # was 6.7% full, refusing 3068 of 3417 identity writes in 15 minutes. Only
+  # *new* keys are refused -- an existing note keeps accepting writes -- so a
+  # 400 here means the note was reaped and cannot be recreated, which is worth
+  # a warning and not worth failing a timer over while the sharded path is fine.
+  local path="$1" label="$2" soft="${3:-0}" got rc_fail=2
+  [ "$soft" = "1" ] && rc_fail=4
+  if ! "${CURL[@]}" "$BASE/kv/$path/set/$ENCODED" >/dev/null; then
+    if [ "$soft" = "1" ]; then
+      printf 'WARN %-28s write refused (namespace full? 400 note limit reached)\n' "$label" >&2
+      return "$rc_fail"
+    fi
+    die "$label: write failed (rate limited? the 429 body says how long to wait)" 2
+  fi
+  if ! got="$("${CURL[@]}" "$BASE/kv/$path" | note_value)"; then
+    [ "$soft" = "1" ] && { printf 'WARN %-28s read-back failed\n' "$label" >&2; return "$rc_fail"; }
+    die "$label: read-back failed" 2
+  fi
   if [ "$got" = "$VALUE" ]; then
     printf 'ok   %-28s %s\n' "$label" "$path"
   else
@@ -107,9 +133,9 @@ heartbeat() { # heartbeat <mb- room> — keep the advertised mailbox from being 
   # ProtectSystem=strict this script has nowhere to write. The one failure mode
   # is a backwards clock step (NTP); the write is then refused and the next run
   # recovers on its own.
-  nonce="$(date +%s%N)"
+  nonce="$(date +%s%N | tr -d '\r')"
   text="keepalive $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  mapfile -t out < <(python3 "$SIGN" say "$room" "$nonce" "$text")
+  mapfile -t out < <(python3 "$SIGN" say "$room" "$nonce" "$text" | tr -d '\r')
   if [ "${#out[@]}" -ne 2 ]; then
     printf 'WARN %-28s sign.py did not return a did and a signature\n' "mailbox" >&2
     return 3
@@ -125,12 +151,17 @@ heartbeat() { # heartbeat <mb- room> — keep the advertised mailbox from being 
 }
 
 rc=0
-refresh "did-$SHARD/$KEY" "sharded (current)" || rc=$?
+# Lower code wins, so the most serious problem is the one the exit status
+# reports. Plain `rc=$?` lets whichever step ran last overwrite it, which would
+# let a soft legacy warning (4) mask an overwritten note (3).
+worst() { local n="$1"; if [ "$rc" -eq 0 ] || [ "$n" -lt "$rc" ]; then rc="$n"; fi; }
+
+refresh "did-$SHARD/$KEY" "sharded (current)" || worst $?
 if [ "${LEGACY:-0}" = "1" ]; then
-  refresh "did/$FP" "legacy (pre-shard)" || rc=$?
+  refresh "did/$FP" "legacy (pre-shard)" 1 || worst $?
 fi
 if [ -n "${MAILBOX:-}" ]; then
-  heartbeat "$MAILBOX" || rc=$?
+  heartbeat "$MAILBOX" || worst $?
 fi
 
 [ "$rc" -eq 0 ] && printf 'note refreshed; 7-day idle timer reset\n'
