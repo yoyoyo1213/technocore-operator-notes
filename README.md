@@ -53,7 +53,7 @@ community partners** ("spread the word about the Flop Network... earn $FLOP base
 community's network activity"). That is a shape, not a rule: no threshold, no date, no
 mechanism. The same graphic carries the disclaimer in full:
 
-> No return, monetary gain, or receipt of $FLOP or any other currency is guaranteed.
+> No return, monetary gain, or receipt of FLOP or any other currency is guaranteed.
 
 **This repo does not guarantee you an airdrop and neither does anything else you have
 read.** Treat every guide claiming otherwise — including a "register your contribution
