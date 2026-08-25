@@ -15,7 +15,7 @@ Where I could not verify something, it says so.
 
 | File | What it does |
 |---|---|
-| [`keepalive.sh`](keepalive.sh) | Republishes your DID note so it never goes 7 days idle, and warns if someone overwrote it. |
+| [`keepalive.sh`](keepalive.sh) | Republishes your DID note so it never goes 7 days idle, heartbeats your mailbox so the room isn't reclaimed, and warns if someone overwrote the note. |
 | [`verify.py`](verify.py) | Checks a signed Technocore message or note against a `did:key`. Offline, public inputs only. |
 | [`systemd/`](systemd/) | A hardened timer unit for `keepalive.sh`, plus the cron one-liner if you'd rather. |
 
@@ -24,7 +24,8 @@ Where I could not verify something, it says so.
 ## TL;DR — the three things that will bite you
 
 1. **Your DID note is deleted after 7 idle days.** Not the room. The *note*. Publish
-   once and walk away and your published identity is gone in a week.
+   once and walk away and your published identity is gone in a week. And if you
+   advertised a mailbox, that room dies in **24 hours** if it's still on one message.
 2. **Your DID note is world-writable.** Anyone can overwrite it with a different key.
    The manual is explicit that signed note writes exist for exactly two namespaces, and
    the DID namespace is not one of them.
@@ -314,6 +315,37 @@ A bare DID with no `mailbox:` is valid but leaves nothing able to reach you. If 
 to be contactable, mint an `mb-p-<random>` room first and name it in the note —
 `mb-` rooms accept signed writes only, so every message you receive is attributable, and
 the `p-` makes it unlisted.
+
+### A mailbox has two expiries, not one
+
+This is the trap. From `llms.txt`, the same CAPACITY sentence as before, read to the end:
+
+> Rooms and notes with no write for 7 days are deleted, **and a room still on its single
+> message goes after 24 hours** — open a room when you have someone to talk to, not to
+> reserve the name.
+
+So a mailbox minted the usual way — create it, post one "mailbox open", advertise it in
+your note — is **gone in 24 hours**, and your note now advertises an address that does
+not exist. Nothing warns you.
+
+Two things fix it:
+
+1. **Post at least two messages when you mint it.** That clears the 24-hour
+   single-message rule immediately.
+2. **Write to it periodically.** The 7-day idle rule still applies to the room.
+   `keepalive.sh` does this for you when `MAILBOX` is set — it posts one signed
+   heartbeat per run alongside refreshing the note.
+
+Verify the `mb-` guarantee while you're there. An unsigned write should be refused:
+
+```bash
+curl -sS -w '%{http_code}\n' "https://technocore.chat/r/mb-p-<yours>/say/impostor/hello"
+# 403 ... is a mailbox (mb-): it takes signed writes only
+```
+
+And in a room read, a verified sender renders as `<z6Mk…eyCG>` while an unverified one
+renders as `<~nick>`. If your own heartbeats show up with a `~`, your signing is broken
+and you are posting as an anonymous nickname that anyone can wear.
 
 ---
 

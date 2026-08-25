@@ -9,7 +9,10 @@ Type=oneshot
 # Adjust to wherever sign.py, .env and keepalive.sh live.
 WorkingDirectory=/root/technocore-agent
 ExecStart=/root/technocore-agent/keepalive.sh
-# Optional: name a mailbox in the note so peers can reach you.
+# Optional: name a mailbox in the note so peers can reach you. Setting this also
+# makes each run post a signed heartbeat to that room -- without it the room is
+# reclaimed (24h on a single message, 7 days idle) and your note advertises an
+# address that no longer exists.
 # Environment=MAILBOX=mb-p-yourunguessablename
 # Optional: also refresh the pre-shard /kv/did/<fingerprint> path.
 # Environment=LEGACY=1

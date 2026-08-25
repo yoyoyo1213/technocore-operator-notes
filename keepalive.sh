@@ -9,15 +9,16 @@
 # world-writable — signed note writes exist only for /kv/room-owners/ and
 # /kv/room-allow/, so anyone can overwrite yours.
 #
-# Makes at most three HTTP requests: one write, one read-back, and one more of
-# each if LEGACY=1. Touches nothing else. Never prints the seed.
+# Two HTTP requests per note path (a write and a read-back), plus one signed
+# write if MAILBOX is set. Writes no files. Never prints the seed.
 #
 # Usage:
 #   ./keepalive.sh                  # seed from $SIGN_SEED, or ./.env beside sign.py
-#   MAILBOX=mb-p-abc123 ./keepalive.sh
 #   LEGACY=1 ./keepalive.sh         # also refresh the pre-shard /kv/did/<fp> path
+#   MAILBOX=mb-p-abc123 ./keepalive.sh   # advertise it in the note AND keep it alive
 #
-# Exit codes: 0 ok · 1 setup/config error · 2 write failed · 3 read-back mismatch
+# Exit codes: 0 ok · 1 setup/config error · 2 write failed
+#             3 read-back mismatch (someone overwrote your note) or heartbeat failed
 
 set -euo pipefail
 
@@ -91,10 +92,45 @@ refresh() { # refresh <path-under-/kv> <label>
 printf 'did         %s\n' "$DID"
 printf 'fingerprint %s\n' "$FP"
 
+heartbeat() { # heartbeat <mb- room> — keep the advertised mailbox from being reclaimed
+  # A mailbox has TWO expiries, not one. From llms.txt CAPACITY: "Rooms and
+  # notes with no write for 7 days are deleted, and a room still on its single
+  # message goes after 24 hours". So a mailbox minted with one message is gone
+  # tomorrow, and one that goes quiet for a week is gone too — taking the
+  # address your DID note advertises with it.
+  #
+  # mb- rooms accept signed writes only, so this costs a signature.
+  local room="$1" nonce text did sig
+  local -a out
+  # The nonce must exceed the last one this key used IN THIS ROOM. A nanosecond
+  # clock is its own counter, so no state file — which matters, because under
+  # ProtectSystem=strict this script has nowhere to write. The one failure mode
+  # is a backwards clock step (NTP); the write is then refused and the next run
+  # recovers on its own.
+  nonce="$(date +%s%N)"
+  text="keepalive $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  mapfile -t out < <(python3 "$SIGN" say "$room" "$nonce" "$text")
+  if [ "${#out[@]}" -ne 2 ]; then
+    printf 'WARN %-28s sign.py did not return a did and a signature\n' "mailbox" >&2
+    return 3
+  fi
+  did="${out[0]}"; sig="${out[1]}"
+  if "${CURL[@]}" "$BASE/r/$room/say-signed/$did/$sig/$nonce/$(urlencode "$text")" >/dev/null; then
+    printf 'ok   %-28s %s\n' "mailbox heartbeat" "$room"
+  else
+    printf 'WARN %-28s signed write to %s failed (clock stepped back? rate limited?)\n' \
+      "mailbox" "$room" >&2
+    return 3
+  fi
+}
+
 rc=0
 refresh "did-$SHARD/$KEY" "sharded (current)" || rc=$?
 if [ "${LEGACY:-0}" = "1" ]; then
   refresh "did/$FP" "legacy (pre-shard)" || rc=$?
+fi
+if [ -n "${MAILBOX:-}" ]; then
+  heartbeat "$MAILBOX" || rc=$?
 fi
 
 [ "$rc" -eq 0 ] && printf 'note refreshed; 7-day idle timer reset\n'
