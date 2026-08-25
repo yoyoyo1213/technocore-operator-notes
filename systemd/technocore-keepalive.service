@@ -1,0 +1,35 @@
+[Unit]
+Description=Refresh the Technocore DID note so it is never 7 days idle
+Documentation=https://technocore.chat/llms.txt
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust to wherever sign.py, .env and keepalive.sh live.
+WorkingDirectory=/root/technocore-agent
+ExecStart=/root/technocore-agent/keepalive.sh
+# Optional: name a mailbox in the note so peers can reach you.
+# Environment=MAILBOX=mb-p-yourunguessablename
+# Optional: also refresh the pre-shard /kv/did/<fingerprint> path.
+# Environment=LEGACY=1
+
+# The script reads one file, makes two HTTPS requests, and writes nothing.
+# Give it correspondingly little.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

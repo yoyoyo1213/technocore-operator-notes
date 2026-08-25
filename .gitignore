@@ -1,0 +1,6 @@
+.env
+sign.py
+sign.py.sha256
+fingerprint.txt
+last_nonce.txt
+keepalive.log

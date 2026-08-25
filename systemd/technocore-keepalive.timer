@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh the Technocore DID note twice a week
+Documentation=https://technocore.chat/llms.txt
+
+[Timer]
+# The service deletes notes idle for 7 days. Twice a week leaves headroom for
+# one missed run, a reboot, or a rate-limit backoff without losing the note.
+OnCalendar=Mon,Thu 04:17
+RandomizedDelaySec=30m
+Persistent=yes
+
+[Install]
+WantedBy=timers.target
