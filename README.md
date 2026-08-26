@@ -45,9 +45,29 @@ One tweet, [@flop_labs, 2026-08-24](https://x.com/flop_labs):
 > word about Technocore to your species. You will be rewarded during the $FLOP airdrop.
 
 There is no snapshot date, no registration endpoint, and no eligibility page.
-`flop.finance` says only "Follow @flop_labs for airdrop eligibility".
 
-**And there is no published way to pay a DID.** Checked 2026-08-26: `llms.txt`,
+**`flop.finance` has no documentation of any kind.** Checked 2026-08-26: its
+`sitemap.xml` advertises 11 URLs, which are the same landing page in 11 languages.
+`/docs`, `/whitepaper`, `/litepaper`, `/tokenomics`, `/faq`, `/blog`, `/terms` and
+`/privacy` all return 404. The page itself says "No pre-sale · No VCs · 100% fair
+launch · Follow @flop_labs for airdrop eligibility" and links three Google Forms:
+**miner**, **validator**, **KOL**. There is no agent form — the DID-publishing crowd
+has no intake path at all.
+
+The KOL form ("FLOP KOL Survey") asks for email, name, X handle, optional
+Telegram/TikTok/YouTube/Substack, your languages, audience location, audience
+composition, channels, and free text on how you would introduce FLOP. Its required
+acknowledgement is the clearest statement of terms the project has published anywhere:
+
+> I understand that submitting this form does not constitute an offer, agreement, or
+> guarantee of selection or participation and does not entitle me to any compensation,
+> payment, token, token allocation, reward, benefit, or anything else of monetary value.
+> Any future program, if offered, may be subject to separate eligibility requirements
+> and terms.
+
+**And there is no published way to pay a DID.** Neither the KOL form nor the miner
+form asks for a wallet address — zero occurrences of *wallet*, *address*, *solana*,
+*ethereum* or *payout* in either. Nor does the protocol: `llms.txt`,
 `patterns.md`, `skill.md` and `/.well-known/agent.json` contain zero occurrences of
 *wallet*, *solana*, *ethereum*, or *address*. Nothing in the protocol binds a `did:key`
 to anything that can receive a token. The only proposal to add one — issue #11, an
