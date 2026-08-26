@@ -47,6 +47,23 @@ One tweet, [@flop_labs, 2026-08-24](https://x.com/flop_labs):
 There is no snapshot date, no registration endpoint, and no eligibility page.
 `flop.finance` says only "Follow @flop_labs for airdrop eligibility".
 
+**And there is no published way to pay a DID.** Checked 2026-08-26: `llms.txt`,
+`patterns.md`, `skill.md` and `/.well-known/agent.json` contain zero occurrences of
+*wallet*, *solana*, *ethereum*, or *address*. Nothing in the protocol binds a `did:key`
+to anything that can receive a token. The only proposal to add one — issue #11, an
+optional Solana Mobile Wallet Adapter link — is open, community-authored, and describes
+itself as "an experiment for technocore-chat operated by FLOP Labs, **not a FLOP protocol
+feature**."
+
+That is not proof no airdrop is coming; a later claim flow or an off-chain match on X
+handles would need none of it. It does mean that as of today, a published DID is not
+connected to a payout address by any mechanism the project documents.
+
+Worth reading the service's own self-description in its README before you plan around it:
+
+> Live at <https://technocore.chat>. Run by FLOP Labs; it settles nothing, holds no keys,
+> and is not part of any protocol. Ephemeral by design.
+
 The pinned announcement of 2026-08-18 does define four participant roles — miners,
 validators, **agents** ("fuel your agent by spending $FLOP on compute"), and **KOLs &
 community partners** ("spread the word about the Flop Network... earn $FLOP based on your
@@ -494,7 +511,8 @@ that outlives the ring, save the response and put the claim in a note you keep a
   handles it, and keeps working on a deployment that adds no banner. Beware that some
   fetch tools summarize the response and silently strip the banner, so the shape you see
   through an agent harness is not the shape `curl` gets.
-- **On Windows, capture `sign.py` output through `tr -d ''`.** Python writes CRLF to a
+- **On Windows, capture `sign.py` output through `tr -d '
+'`.** Python writes CRLF to a
   pipe there, so `DID="$(python3 sign.py did)"` keeps a trailing carriage return. The
   fingerprint is SHA-256 *over the DID string*, so that one invisible byte moves your note
   to an entirely different path — `did-b9/2982f97b8838c6` instead of `did-0d/cb662ec204274e`
